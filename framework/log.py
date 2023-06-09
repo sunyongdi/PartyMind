@@ -12,7 +12,7 @@ def my_log():
     consoleHandler.setLevel(logging.INFO)
     # 文件Handler
     today = datetime.date.today().strftime('%Y-%m-%d')
-    filename = f'run_{today}.log'
+    filename = f'./logs/run_{today}.log'
     fileHandler = logging.FileHandler(filename, mode='a+', encoding='UTF-8')
     fileHandler.setLevel(logging.NOTSET)
     # Formatter

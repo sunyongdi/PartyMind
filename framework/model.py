@@ -68,10 +68,12 @@ class MachineTranslation:
 
 class TextClustering:
     def __init__(self) -> None:
-        self.userdict_path = '/Users/sunyongdi/Desktop/PersonalProject/project-template/codes/text_clustering/base_dict/userdict.txt'
-        self.stopwords_path = '/Users/sunyongdi/Desktop/PersonalProject/project-template/codes/text_clustering/base_dict/stopwords.txt'
+        self.userdict_path = '/root/sunyd/code/PartyMind/codes/text_clustering/base_dict/userdict.txt'
+        self.stopwords_path = '/root/sunyd/code/PartyMind/codes/text_clustering/base_dict/stopwords.txt'
+        
         # 加载用户自定义词典
         self.__load_userdict()
+        
         # 加载停用词表
         self.stopwords = self.__add_stopwords()
 
@@ -92,7 +94,7 @@ class TextClustering:
         words = jieba.cut(text)
         return [word for word in words if word not in self.stopwords and len(word) > 1]
 
-    def predict(self, corpus, userdict=None, stopwords=None):
+    def predict(self, corpus, n_clusters=5, n_keywords=5, userdict=None, stopwords=None):
         if stopwords and isinstance(stopwords, list):
             for word in stopwords:
                 self.stopwords.add(word.strip())
@@ -103,8 +105,8 @@ class TextClustering:
 
         # 训练词向量模型
         sentences = [self.__cut_text(text) for text in corpus]
-
-        model = Word2Vec(sentences, vector_size=100, min_count=5)
+        
+        model = Word2Vec(sentences, vector_size=100, min_count=1)
 
         # 得到所有文本的词向量表示
         X = []
@@ -119,19 +121,19 @@ class TextClustering:
             X.append(np.mean(vecs, axis=0))
 
         # 使用K-Means算法将文本聚类为5个簇
-        kmeans = KMeans(n_clusters=5)
+        kmeans = KMeans(n_clusters=n_clusters)
         labels = kmeans.fit_predict(X)
 
         # 对每个簇计算平均向量并生成主题词
         res = []
-        for i in range(5):
+        for i in range(n_clusters):
             cluster_docs = [corpus[j]
                             for j in range(len(corpus)) if labels[j] == i]
             cluster_vecs = [X[j] for j in range(len(X)) if labels[j] == i]
             avg_vec = np.mean(cluster_vecs, axis=0)
             sim_scores = model.wv.cosine_similarities(
                 avg_vec, model.wv.vectors)
-            top_k = np.argsort(sim_scores)[-5:]
+            top_k = np.argsort(sim_scores)[-n_keywords:]
             keywords = [model.wv.index_to_key[idx] for idx in top_k]
             res.append({
                 "cluster": i,
@@ -168,4 +170,4 @@ if __name__ == '__main__':
               '”中国的先进分子由此认识到马克思主义对中国革命运动的指导作用，接受了马克思主义，树立了无产阶级世界观，并且在实践中得出向俄国革命学习、“走俄国人的路”的结论。']
 
     # print(text_cluster.predict(corpus))
-    print(text_cluster.predict(corpus, ['悍然强占老西开'], ['提出']))
+    print(text_cluster.predict(corpus, None, None))

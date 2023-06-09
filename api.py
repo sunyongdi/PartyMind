@@ -1,5 +1,6 @@
 # coding: UTF-8
 import torch
+import json
 
 from flask import Flask
 from flask import jsonify
@@ -15,7 +16,7 @@ from framework.model import TextClustering
 
 # 接收参数
 parser = argparse.ArgumentParser(description='接口名称')
-parser.add_argument("--port", type=float, default=9901, help="端口")
+parser.add_argument("--port", type=float, default=9902, help="端口")
 # parser.add_argument("--address", type=str,
 #                     default='/api_template', help="接口地址")
 parser.add_argument("--gpu_ids", type=str, default='-1',
@@ -53,39 +54,62 @@ def language_identifier():
     logger.info(f'json_data:{json_data}')
     sentence = json_data.get('sentence')
     logger.info(f'sentence:{sentence}')
+    
     # 1.predict languages
     lang = lang_model.predict(sentence)
+    logger.info(f'lang:{lang}')
+    
     trans_sentence = sentence
     if lang == 'en':
         # 2.translation en to zh
-        trans_sentence = trans_model(sentence)
+        trans_sentence = trans_model.predict(sentence)
+        logger.info(f'en_trans_sentence:{trans_sentence}')
+    elif lang == 'zh':
+        trans_sentence = sentence
+    else:
+        trans_sentence = '暂为支持该语种翻译'
     logger.info(f'显存占用2:{torch.cuda.memory_allocated()}')
     return jsonify({'sentence': sentence, 'trans_sentence': trans_sentence, 'lang': lang})
 
 
-@app.route('text_cluster', methods=['POST'])
+@app.route('/text_cluster', methods=['POST'])
 def text_cluster():
     """
     文本聚类接口
     """
     global cluster_model
-    json_data = request.get_json()
-    logger.info(f'json_data:{json_data}')
+    form_data = request.form
+    logger.info(f'form_data:{form_data}')
     corpus = request.files['corpus']
+    
     # 读取文件内容
-    corpus_docs = corpus.read().decode('utf-8')
+    corpus_docs = corpus.read().decode('utf-8').splitlines()
     logger.info(f'corpus_docs:{corpus_docs}')
 
-    user_dict = json_data.get('user_dict')
+    # 聚类的数量
+    n_clusters = int(form_data.get('n_clusters'))
+    logger.info(f'n_clusters:{n_clusters}')
+
+    # 关键字的数量
+    n_keywords = int(form_data.get('n_keywords'))
+    logger.info(f'n_keywords:{n_keywords}')
+
+    # 用户词表
+    user_dict = form_data.get('user_dict')
+    user_dict = json.loads(user_dict)
     logger.info(f'user_dict:{user_dict}')
-    stop_words = json_data.get('stop_words')
+    
+    # 停用词表
+    stop_words = form_data.get('stop_words')
+    stop_words = json.loads(stop_words)
     logger.info(f'stop_words:{stop_words}')
-    # 1.predict cluster
-    # res = cluster_model.predict()
-    res = []
+    
+    # 1.cluster
+    cluster_res = cluster_model.predict(corpus_docs, n_clusters, n_keywords,  user_dict, stop_words)
+    logger.info(f'cluster_res:{cluster_res}')
 
     logger.info(f'显存占用2:{torch.cuda.memory_allocated()}')
-    return jsonify({'corpus': corpus, 'user_dict': user_dict, 'stop_words': stop_words, 'data': res})
+    return jsonify({'corpus': corpus_docs, 'user_dict': user_dict, 'stop_words': stop_words, 'data': cluster_res})
 
 
 if __name__ == '__main__':
